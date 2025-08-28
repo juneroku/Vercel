@@ -5,6 +5,7 @@
   "description": "Micro-services web app on Vercel that ingests Open-Meteo data into MongoDB and displays it.",
   "scripts": {
     "dev": "vercel dev",
+    "start": "vercel dev",
     "lint": "echo 'no lint configured'",
     "test": "node -e \"console.log('ok')\""
   },
@@ -13,5 +14,8 @@
   },
   "dependencies": {
     "mongodb": "^5.9.0"
+  },
+  "devDependencies": {
+    "vercel": "^46.0.5"
   }
 }

@@ -5,7 +5,8 @@
   "description": "Micro-services web app on Vercel that ingests Open-Meteo data into MongoDB and displays it.",
   "scripts": {
     "dev": "vercel dev",
-    "start": "npx serve .",
+    "start": "vercel dev",
+    "build": "echo 'No build step needed'",
     "lint": "echo 'no lint configured'",
     "test": "node -e \"console.log('ok')\""
   },

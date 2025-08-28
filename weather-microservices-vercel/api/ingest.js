@@ -1,7 +1,5 @@
-require('dotenv').config();
 const { fetchOpenMeteo } = require('./_lib/openMeteo');
-
-let cachedWeatherData = null;
+require('dotenv').config();
 
 module.exports = async (req, res) => {
   try {
@@ -25,22 +23,39 @@ module.exports = async (req, res) => {
     const currentHour = new Date().getHours();
     
     // Get current weather
-    const currentWeather = {
-      temperature: hourly.temperature_2m ? hourly.temperature_2m[currentHour] : 20,
-      humidity: hourly.relative_humidity_2m ? hourly.relative_humidity_2m[currentHour] : 65,
-      wind_speed: hourly.windspeed_10m ? hourly.windspeed_10m[currentHour] : 10,
-      description: hourly.cloudcover && hourly.cloudcover[currentHour] > 50 ? "Cloudy" : "Clear",
-      location: location_name,
-      fetched_at: new Date().toISOString()
-    };
+    // Process hourly data for next 24 hours
+    const next24Hours = [];
+    const now = new Date();
+    const currentHourIndex = now.getHours();
+    
+    for (let i = 0; i < 24; i++) {
+      const hourIndex = (currentHourIndex + i) % 24;
+      if (hourly.time && hourly.time.length > hourIndex) {
+        next24Hours.push({
+          time: hourly.time[hourIndex],
+          temperature: hourly.temperature_2m ? hourly.temperature_2m[hourIndex] : null,
+          humidity: hourly.relative_humidity_2m ? hourly.relative_humidity_2m[hourIndex] : null,
+          wind_speed: hourly.windspeed_10m ? hourly.windspeed_10m[hourIndex] : null
+        });
+      }
+    }
 
-    // Cache the weather data globally
-    cachedWeatherData = currentWeather;
+    const weatherData = {
+      current: {
+        temperature: hourly.temperature_2m ? hourly.temperature_2m[currentHourIndex] : null,
+        humidity: hourly.relative_humidity_2m ? hourly.relative_humidity_2m[currentHourIndex] : null,
+        wind_speed: hourly.windspeed_10m ? hourly.windspeed_10m[currentHourIndex] : null,
+        description: hourly.cloudcover && hourly.cloudcover[currentHourIndex] > 50 ? "Cloudy" : "Clear"
+      },
+      location: location_name,
+      fetched_at: now.toISOString(),
+      forecast: next24Hours
+    };
     
     res.status(200).json({ 
       ok: true, 
-      data: currentWeather,
-      message: "Weather data updated successfully"
+      data: weatherData,
+      message: "Weather data fetched successfully"
     });
   } catch (err) {
     console.error(err);

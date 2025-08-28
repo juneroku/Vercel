@@ -1,19 +1,20 @@
-const { getDb } = require('./_lib/mongo');
+// Get access to the shared cached weather data
+const { cachedWeatherData } = require('./ingest');
 
 module.exports = async (req, res) => {
   try {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') || '1', 10)));
-    const db = await getDb();
-    const docs = await db
-      .collection('weather_readings')
-      .find({})
-      .sort({ fetched_at: -1 })
-      .limit(limit)
-      .toArray();
-
+    if (!cachedWeatherData) {
+      return res.status(404).json({
+        ok: false,
+        error: "No weather data available. Please run /api/ingest first to fetch the latest weather data."
+      });
+    }
+    
     res.setHeader('content-type', 'application/json');
-    res.status(200).end(JSON.stringify({ ok: true, docs }));
+    res.status(200).json({ 
+      ok: true, 
+      data: cachedWeatherData
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: err.message });

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" class="h-full scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🌤️ Weather Now — Public Dashboard</title>
+  <meta name="description" content="Real-time weather dashboard powered by Open-Meteo" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌤️</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    .glass { backdrop-filter: saturate(180%) blur(12px); background: color-mix(in oklab, canvas, canvastext 4%); }
+    body { background: radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,.20), transparent 70%), radial-gradient(800px 400px at 90% 10%, rgba(234,88,12,.2), transparent 60%); }
+    @media (prefers-color-scheme: dark) {
+      body { background: radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,.25), transparent 70%), radial-gradient(800px 400px at 90% 10%, rgba(234,88,12,.28), transparent 60%); }
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
+  <header class="max-w-6xl mx-auto px-4 pt-8 pb-4">
+    <div class="glass rounded-2xl p-5 shadow-xl">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight">🌤️ Weather Now</h1>
+          <p class="opacity-70">Automatic Open‑Meteo ➜ MongoDB ➜ Vercel</p>
+        </div>
+        <div id="location" class="text-right">
+          <div class="text-xl font-semibold" id="locName">—</div>
+          <div class="opacity-70 text-sm" id="locCoords">—</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 pb-16">
+    <section class="grid md:grid-cols-3 gap-4 mb-4">
+      <div class="glass rounded-2xl p-5 shadow-xl">
+        <div class="text-sm opacity-70">Current Temperature</div>
+        <div class="text-4xl font-bold" id="currentTemp">—</div>
+      </div>
+      <div class="glass rounded-2xl p-5 shadow-xl">
+        <div class="text-sm opacity-70">Humidity</div>
+        <div class="text-4xl font-bold" id="currentHum">—</div>
+      </div>
+      <div class="glass rounded-2xl p-5 shadow-xl">
+        <div class="text-sm opacity-70">Wind Speed</div>
+        <div class="text-4xl font-bold" id="currentWind">—</div>
+      </div>
+    </section>
+    <section class="glass rounded-2xl p-6 shadow-xl">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">Next 24 hours</h2>
+        <button id="refreshBtn" class="px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/5 transition">Refresh</button>
+      </div>
+      <canvas id="tempChart" height="96"></canvas>
+    </section>
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-4 pb-8 opacity-70 text-sm">
+    Data from <a class="underline" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open‑Meteo</a>. Hosted on Vercel. Stored in MongoDB.
+  </footer>
+
+  <script>
+    async function loadLatest() {
+      const res = await fetch('/api/weather?limit=1', { cache: 'no-store' });
+      const data = await res.json();
+      if (!data.ok || !data.docs || !data.docs.length) throw new Error('No data');
+
+      const doc = data.docs[0];
+      const loc = doc.location || {};
+      document.getElementById('locName').textContent = loc.name || '—';
+      document.getElementById('locCoords').textContent = `${loc.latitude?.toFixed?.(4)}, ${loc.longitude?.toFixed?.(4)} • ${loc.timezone || ''}`;
+
+      const hourly = doc.hourly || [];
+      const now = new Date();
+
+      // future 24 hours
+      const upcoming = hourly.filter(h => new Date(h.time) >= now).slice(0, 24);
+      const use = upcoming.length >= 6 ? upcoming : hourly.slice(-24); // fallback
+
+      // derive "current" as the nearest item to now
+      const nearest = hourly.reduce((best, h) => {
+        const d = Math.abs(new Date(h.time) - now);
+        return d < best.d ? { d, h } : best;
+      }, { d: Infinity, h: null }).h || use[0];
+
+      document.getElementById('currentTemp').textContent = nearest?.temperature_2m != null ? `${nearest.temperature_2m.toFixed(1)}°C` : '—';
+      document.getElementById('currentHum').textContent  = nearest?.relative_humidity_2m != null ? `${nearest.relative_humidity_2m}%` : '—';
+      document.getElementById('currentWind').textContent = nearest?.windspeed_10m != null ? `${nearest.windspeed_10m} m/s` : '—';
+
+      const labels = use.map(p => new Date(p.time));
+      const temps  = use.map(p => p.temperature_2m);
+
+      // Draw chart
+      if (window.tempChart) window.tempChart.destroy();
+      const ctx = document.getElementById('tempChart').getContext('2d');
+      window.tempChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Temperature (°C)',
+            data: temps,
+            fill: false,
+            tension: 0.35,
+            pointRadius: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { type: 'time', time: { unit: 'hour', tooltipFormat: 'PPpp' }},
+            y: { beginAtZero: false }
+          },
+          plugins: { legend: { display: true } }
+        }
+      });
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', loadLatest);
+    loadLatest().catch(err => {
+      console.error(err);
+      alert('Failed to load data. Please run /api/ingest at least once after deploy.');
+    });
+  </script>
+</body>
+</html>

@@ -4,10 +4,11 @@ let cachedWeatherData = null;
 
 module.exports = async (req, res) => {
   try {
-    const lat = 13.7563;  // Bangkok coordinates
-    const lon = 100.5018;
-    const timezone = 'Asia/Bangkok';
-    const location_name = 'Bangkok, TH';
+    // Get environment variables with Bangkok defaults
+    const lat = parseFloat(process.env.LAT || '13.7563');
+    const lon = parseFloat(process.env.LON || '100.5018');
+    const timezone = process.env.TIMEZONE || 'Asia/Bangkok';
+    const location_name = process.env.LOCATION_NAME || 'Bangkok, TH';
 
     const { url, json } = await fetchOpenMeteo({ lat, lon, timezone });
 

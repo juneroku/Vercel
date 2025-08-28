@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { fetchOpenMeteo } = require('./_lib/openMeteo');
 
 let cachedWeatherData = null;
@@ -9,6 +10,14 @@ module.exports = async (req, res) => {
     const lon = parseFloat(process.env.LON || '100.5018');
     const timezone = process.env.TIMEZONE || 'Asia/Bangkok';
     const location_name = process.env.LOCATION_NAME || 'Bangkok, TH';
+    
+    // Debug logging
+    console.log('Environment variables:', {
+      LAT: process.env.LAT,
+      LON: process.env.LON,
+      TIMEZONE: process.env.TIMEZONE,
+      LOCATION_NAME: process.env.LOCATION_NAME
+    });
 
     const { url, json } = await fetchOpenMeteo({ lat, lon, timezone });
 
